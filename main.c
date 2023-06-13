@@ -78,14 +78,16 @@ void my_Bcast_rb(void *buffer, int count, MPI_Datatype datatype, int root, MPI_C
 //O tempo gasto nessa função de verificação 
 //  NAO deve influenciar suas medidas. 
 
-void verifica_my_Bcast_rb( void *buffer, int count, MPI_Datatype datatype,
+void verifica_my_Bcast( void *buffer, int count, MPI_Datatype datatype,
                            int root, MPI_Comm comm ){
     int comm_size;
     int my_rank;
     
     MPI_Comm_size( comm, &comm_size );
     MPI_Comm_rank( comm, &my_rank );
-    static long *buff = (long *) calloc( count*comm_size, sizeof(long) );
+    static long *buff = NULL;
+    if (!buff)
+        buff = (long *) calloc( count*comm_size, sizeof(long) );
     
     
     // preenche a faixa do raiz com alguma coisa (apenas no raiz)
@@ -207,7 +209,7 @@ int main(int argc, char *argv[]){
     #if BCAST_TYPE == USE_MPI_Bcast
         MPI_Bcast_rb( inmsg, ni, MPI_LONG, raiz, MPI_COMM_WORLD );
     #elif BCAST_TYPE == USE_my_Bcast
-        my_Bcast( inmsg, ni, MPI_LONG, raiz, MPI_COMM_WORLD );
+        my_Bcast_rb( inmsg, ni, MPI_LONG, raiz, MPI_COMM_WORLD );
     #else
         assert( BCAST_TYPE == USE_MPI_Bcast || BCAST_TYPE == USE_my_Bcast );
     #endif    
@@ -243,7 +245,6 @@ int main(int argc, char *argv[]){
         printf("\n");
     #endif
     
-    wz_debug = 1;
     // verifica_my_Bcast a partir de raiz 0  ---------- COM valores da linha de comando
     verifica_my_Bcast( inmsg, ni, MPI_LONG, raiz, MPI_COMM_WORLD );
 
