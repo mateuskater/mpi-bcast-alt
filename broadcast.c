@@ -44,18 +44,72 @@ const int SEED = 100;
 #define PHYSIC_RANK( logic_rank, root, comm_size ) \
         (( logic_rank + root ) % comm_size)        
 
+// Calcula qual o rank logico do participante que irá enviar para o rank logico recv
+int calculaEnviador(int recv){
+    int menorPot2 = 1;
+    int n = recv;
+    while (n) {
+        menorPot2 *= 2;
+        n /= 2;
+    }
+    menorPot2/=2;
+    return (~menorPot2) & recv;
+}
+
+// Calcula em qual iteracao o rank logico recebe sua mensagem
+int calculaIteracao(int rank){
+    int menorPot2 = 1;
+    int n = rank;
+    while (n) {
+        menorPot2 *= 2;
+        n /= 2;
+    }
+    menorPot2/=2;
+    return menorPot2;
+}
+
 // int MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm)
 void my_Bcast_rb(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm) {
-////////////////// INSERIR AQUI SEU CODIGO
-    // int rank;
-    // MPI_Init();
-    // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    // if (rank == 0){
-    //     MPI_Send();
-    // }else{
 
-    // }
-    // MPI_Finalize();
+    int rankFis;
+    int comm_size;
+    MPI_Comm_rank(comm, &rankFis);
+    MPI_Comm_size(comm, &comm_size);
+    int rankLog = LOGIC_RANK(rankFis, root, comm_size);
+    // Receber de um processo e enviar para os outros
+    if (rankLog != 0){
+        int rankLogEnviador = calculaEnviador(rankLog);
+
+        int rankFisEnviador = PHYSIC_RANK(rankLogEnviador, root, comm_size);
+        MPI_Status status;
+
+        // fprintf(stderr,"%d(%d): espero receber do %d(%d)\n",
+        //         rankLog, rankFis, rankLogEnviador, rankFisEnviador);
+        // Participantes impares receberam a segunda metade
+        if (rankLog % 2){
+            // TODO: arrumar pontero do buffer
+            MPI_Recv(buffer, count, datatype, rankFisEnviador, 0, comm, &status);
+        }
+        // Participantes pares receberam a primeira metade
+        else {
+            MPI_Recv(buffer, count, datatype, rankFisEnviador, 0, comm, &status);
+        }
+        // fprintf(stderr,"%d(%d): recebi do %d(%d)\n",
+        //         rankLog, rankFis, rankLogEnviador, rankFisEnviador);
+    }
+    // Enviar para os processoss necessários
+    for(int fase = calculaIteracao(rankLog); 1<<fase < comm_size; fase++){
+        // Indice logico para qual enviar na proxima iteração
+        int proxSend = rankLog + (1<<fase);
+                                //2 ^ fase
+        // fprintf(stderr,"%d(%d): envio para o %d(%d)\n",
+        //         rankLog, rankFis, proxSend, PHYSIC_RANK(proxSend, root, comm_size));
+        MPI_Send(buffer, count, datatype, PHYSIC_RANK(proxSend, root, comm_size), 0, comm);
+        // fprintf(stderr,"%d(%d): enviei para o %d(%d)\n",
+        //         rankLog, rankFis, proxSend, PHYSIC_RANK(proxSend, root, comm_size));
+    }
+
+    // Fazer troca com o vizinho proximo
 
 }
 
