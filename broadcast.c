@@ -44,6 +44,18 @@ const int SEED = 100;
 #define PHYSIC_RANK( logic_rank, root, comm_size ) \
         (( logic_rank + root ) % comm_size)        
 
+// Calcula qual o rank logico do participante que irá enviar para o rank logico recv
+int calculaEnviador(int recv){
+    int menorPot2 = 1;
+    int n = recv;
+    while (n) {
+        menorPot2 *= 2;
+        n /= 2;
+    }
+    menorPot2/=2;
+    return (~menorPot2) & recv;
+}
+
 // Calcula em qual iteracao o rank logico recebe sua mensagem
 int calculaIteracao(int rank) {
     int n = rank;
@@ -65,26 +77,29 @@ void my_Bcast_rb(void *buffer, int count, MPI_Datatype datatype, int root, MPI_C
     int rankLog = LOGIC_RANK(rankFis, root, comm_size);
 
     long *bufflong = (long *)buffer;
-    long *halfbuff = bufflong + (count/2);
+    long *halfbuff = &bufflong[count/2];
+    //printf("%d: bufflong = %p, halfbuff = %p, count = %d\n", rankLog, bufflong, halfbuff, count);
 
+    MPI_Status status;
     // Receber de um processo e enviar para os outros
     if (rankLog != 0){
-        MPI_Status status;
+        int rankLogEnviador = calculaEnviador(rankLog);
+        int rankFisEnviador = PHYSIC_RANK(rankLogEnviador, root, comm_size);
 
         // fprintf(stderr,"%d(%d): espero receber do %d(%d)\n",
         //         rankLog, rankFis, rankLogEnviador, rankFisEnviador);
-        // Participantes impares receberam a segunda metade
-        if (rankLog % 2){
-            // TODO: arrumar pontero do buffer
-            MPI_Recv((void*)halfbuff, count/2 + count%2, datatype, MPI_ANY_SOURCE, 0, comm, &status);
+        // Participantes impares receberao a segunda metade
+        if (rankLog % 2 == 1){
+            MPI_Recv((void*)halfbuff, count/2 + count%2, datatype, rankFisEnviador, 0, comm, &status);
         }
         // Participantes pares receberam a primeira metade
         else {
-            MPI_Recv(buffer, count/2, datatype, MPI_ANY_SOURCE, 0, comm, &status);
+            MPI_Recv((void*)bufflong, count/2, datatype, rankFisEnviador, 0, comm, &status);
         }
         // fprintf(stderr,"%d(%d): recebi do %d(%d)\n",
         //         rankLog, rankFis, rankLogEnviador, rankFisEnviador);
     }
+
     // Enviar para os processoss necessários
     for(int fase = calculaIteracao(rankLog); 1<<fase < comm_size; fase++){
         // Indice logico para qual enviar na proxima iteração
@@ -106,8 +121,25 @@ void my_Bcast_rb(void *buffer, int count, MPI_Datatype datatype, int root, MPI_C
         //         rankLog, rankFis, proxSend, PHYSIC_RANK(proxSend, root, comm_size));
     }
 
+    if (halfbuff == bufflong) return;
     // Fazer troca com o vizinho proximo
-
+    // Pares enviam primeiro e depois impares enviam
+    if(rankLog % 2) {
+      int dest = (rankLog + 1) % comm_size;
+      // recebe
+      MPI_Recv((void*)halfbuff, count/2 + count%2, datatype, dest, 0, comm, &status);
+      // envia
+      MPI_Send(buffer, count/2, datatype, PHYSIC_RANK(dest, root, comm_size), 0, comm);
+    }
+    else {
+      if (rankLog == 0 && comm_size % 2 == 1) return;
+      int dest = rankLog - 1;
+      if (rankLog == 0) dest = comm_size - 1;
+      // envia
+      MPI_Send(buffer, count/2, datatype, PHYSIC_RANK(dest, root, comm_size), 0, comm);
+      // recebe
+      MPI_Recv((void*)halfbuff, count/2 + count%2, datatype, dest, 0, comm, &status);
+    }
 }
 
 // OBS1: sua função my_Bcast_rb
