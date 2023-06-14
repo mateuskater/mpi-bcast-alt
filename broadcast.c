@@ -57,15 +57,14 @@ int calculaEnviador(int recv){
 }
 
 // Calcula em qual iteracao o rank logico recebe sua mensagem
-int calculaIteracao(int rank){
-    int menorPot2 = 1;
+int calculaIteracao(int rank) {
     int n = rank;
+    int count = 0;
     while (n) {
-        menorPot2 *= 2;
         n /= 2;
+        count++;
     }
-    menorPot2/=2;
-    return menorPot2;
+    return count;
 }
 
 // int MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm)
@@ -104,7 +103,9 @@ void my_Bcast_rb(void *buffer, int count, MPI_Datatype datatype, int root, MPI_C
                                 //2 ^ fase
         // fprintf(stderr,"%d(%d): envio para o %d(%d)\n",
         //         rankLog, rankFis, proxSend, PHYSIC_RANK(proxSend, root, comm_size));
-        MPI_Send(buffer, count, datatype, PHYSIC_RANK(proxSend, root, comm_size), 0, comm);
+        if (proxSend < comm_size) {
+          MPI_Send(buffer, count, datatype, PHYSIC_RANK(proxSend, root, comm_size), 0, comm);
+        }
         // fprintf(stderr,"%d(%d): enviei para o %d(%d)\n",
         //         rankLog, rankFis, proxSend, PHYSIC_RANK(proxSend, root, comm_size));
     }
