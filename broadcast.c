@@ -125,17 +125,19 @@ void my_Bcast_rb(void *buffer, int count, MPI_Datatype datatype, int root, MPI_C
     // Pares enviam primeiro e depois impares enviam
     if(rankLog % 2) {
       int dest = (rankLog + 1) % comm_size;
+      dest = PHYSIC_RANK(dest, root, comm_size);
       // recebe
       MPI_Recv(buffer, count/2, datatype, dest, 0, comm, &status);
       // envia
-      MPI_Send((void*)halfbuff, count/2 + count%2, datatype, PHYSIC_RANK(dest, root, comm_size), 0, comm);
+      MPI_Send((void*)halfbuff, count/2 + count%2, datatype, dest, 0, comm);
     }
     else {
       if (rankLog == 0 && comm_size % 2 == 1) return;
       int dest = rankLog - 1;
       if (rankLog == 0) dest = comm_size - 1;
+      dest = PHYSIC_RANK(dest, root, comm_size);
       // envia
-      MPI_Send(buffer, count/2, datatype, PHYSIC_RANK(dest, root, comm_size), 0, comm);
+      MPI_Send(buffer, count/2, datatype, dest, 0, comm);
       // recebe
       MPI_Recv((void*)halfbuff, count/2 + count%2, datatype, dest, 0, comm, &status);
     }
