@@ -1,4 +1,6 @@
 // TRABALHO2: CI316 1o semestre 2023 (myBroadcast_rb.c)
+// Aluno: Iago Mello Floriano
+// GRR: 20196049
 // Aluno:
 // GRR:
 //
